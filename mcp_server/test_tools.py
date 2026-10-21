@@ -17,12 +17,18 @@ def test_application_status(monkeypatch):
     assert application_status(period("20261101 ~ 20261130")) == "신청예정"
     assert application_status(period("20260301 ~ 20260331")) == "마감"
     assert application_status(period("20260101 ~ 20260131\n20261001 ~ 20261031")) == "신청중"  # 기간 두 줄
+    assert application_status(period("20261001 ~ 20261031\\N20261201 ~ 20261231")) == "신청중"  # 실제 데이터 형식(글자 \N)
 
 
 def test_age_ok():
-    assert age_ok({"sprtTrgtAgeLmtYn": "Y", "sprtTrgtMinAge": "0", "sprtTrgtMaxAge": "0"}, 50)  # Y = 제한 없음
-    assert age_ok({"sprtTrgtAgeLmtYn": "N", "sprtTrgtMinAge": "19", "sprtTrgtMaxAge": "34"}, 24)
-    assert not age_ok({"sprtTrgtAgeLmtYn": "N", "sprtTrgtMinAge": "19", "sprtTrgtMaxAge": "34"}, 35)
+    rng = lambda yn, lo, hi: {"sprtTrgtAgeLmtYn": yn, "sprtTrgtMinAge": lo, "sprtTrgtMaxAge": hi}
+    assert age_ok(rng("Y", "0", "0"), 50)          # 나이 정보 없음 → 통과
+    assert not age_ok(rng("Y", "18", "39"), 45)    # Y라도 범위가 있으면 지킨다 (실제 680개)
+    assert age_ok(rng("N", "19", "34"), 24)
+    assert not age_ok(rng("N", "19", "34"), 35)
+    assert age_ok(rng("N", "0", "0"), 24)          # N인데 0~0 → 통과 (실제 63개)
+    assert age_ok(rng("N", "18", "0"), 50)         # 최대 0 = 상한 없음
+    assert age_ok(rng("N", "", ""), 24)            # 빈 값
 
 
 def test_region_of():

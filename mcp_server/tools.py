@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import date
 from pathlib import Path
 
@@ -32,11 +33,13 @@ def application_status(p: dict) -> str:
     if code == "0057003":
         return "마감"
     today = get_today().strftime("%Y%m%d")
-    periods = [line.split("~") for line in p.get("aplyYmd", "").splitlines() if "~" in line]
+    # "YYYYMMDD ~ YYYYMMDD" 쌍을 모두 찾는다. 기간이 두 개인 정책은 줄바꿈 대신
+    # 글자 그대로 "\\N"으로 이어져 있어서(데이터로 확인) 줄 단위로 나누면 깨진다.
+    periods = re.findall(r"(\d{8})\s*~\s*(\d{8})", p.get("aplyYmd", ""))
     for start, end in periods:
-        if start.strip() <= today <= end.strip():
+        if start <= today <= end:
             return "신청중"
-    if any(today < start.strip() for start, _ in periods):
+    if any(today < start for start, _ in periods):
         return "신청예정"
     return "마감"
 
@@ -48,9 +51,13 @@ def region_of(p: dict) -> str:
 
 
 def age_ok(p: dict, age: int) -> bool:
-    if p.get("sprtTrgtAgeLmtYn") == "Y":   # 주의: Y = 나이 제한 없음 (데이터로 확인)
+    """나이 조건 판단. sprtTrgtAgeLmtYn(Y/N) 칸은 실제 나이 값과 맞지 않는 경우가 많아서
+    (전수 확인: Y인데 범위가 있는 정책 680개, N인데 0~0인 정책 63개) 무시하고 숫자만 본다."""
+    lo = int(p.get("sprtTrgtMinAge") or 0)
+    hi = int(p.get("sprtTrgtMaxAge") or 0)
+    if lo == 0 and hi == 0:                 # 나이 정보 없음 → 제한 없는 것으로 본다
         return True
-    return int(p["sprtTrgtMinAge"] or 0) <= age <= int(p["sprtTrgtMaxAge"] or 999)
+    return lo <= age <= (hi if hi > 0 else 999)   # 최대가 0이면 상한 없음
 
 
 def find_policies(age: int | None = None, region: str | None = None,
@@ -78,3 +85,16 @@ def find_policies(age: int | None = None, region: str | None = None,
         if len(results) >= limit:
             break
     return results
+
+
+def catalog() -> dict:
+    """정책 데이터 안내판: 기준일, 전체 수, 분야 목록, 신청상태별 개수"""
+    from collections import Counter
+    return {
+        "데이터_기준일": "2026-10-21",
+        "전체_정책수": len(POLICIES),
+        # 분야가 "취업,창업"처럼 여러 개 붙어 있는 정책이 있어서 쉼표로 나눠 하나씩 모은다
+        "분야_목록": sorted({name.strip() for p in POLICIES
+                         for name in p.get("mclsfNm", "").split(",") if name.strip()}),
+        "신청상태별_개수": dict(Counter(application_status(p) for p in POLICIES)),
+    }
