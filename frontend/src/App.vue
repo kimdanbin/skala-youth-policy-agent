@@ -16,7 +16,7 @@ async function send() {
     body: JSON.stringify({ message: text }),           // ChatRequest 모양에 맞춰서
   })
   const data = await res.json()
-  messages.value.push({ role: 'bot', text: data.reply })
+  messages.value.push({ role: 'bot', text: data.reply, sources: data.sources })
 }
 </script>
 
@@ -25,6 +25,7 @@ async function send() {
     <h1>청년정책 안내</h1>
     <div v-for="(m, i) in messages" :key="i" :class="m.role">
       {{ m.text }}
+      <small v-if="m.sources"><br />출처: {{ [...new Set(m.sources)].join(', ') }}</small>
     </div>
     <form @submit.prevent="send">
       <input v-model="input" placeholder="질문을 입력하세요" />

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from rag.chain import answer
 
 app = FastAPI()
 app.add_middleware(
@@ -22,4 +23,4 @@ def health():
 
 @app.post("/chat")
 def chat(req: ChatRequest):
-    return {"reply": f"echo: {req.message}"}
+    return answer(req.message)
