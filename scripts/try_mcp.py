@@ -1,11 +1,18 @@
 import asyncio
+import os
+import sys
 from pathlib import Path
 
 from fastmcp import Client
+from fastmcp.client.transports import PythonStdioTransport
+
+# 환경변수(FAKE_TODAY 등)를 서버 프로세스에 명시적으로 넘긴다 (안 넘기면 서버는 진짜 오늘 날짜를 씀)
+SERVER = Path(__file__).resolve().parents[1] / "mcp_server" / "server.py"
+TRANSPORT = PythonStdioTransport(SERVER, env=dict(os.environ), python_cmd=sys.executable)
 
 
 async def main():
-    async with Client(Path("mcp_server/server.py")) as client:     # 서버를 띄우고 연결
+    async with Client(TRANSPORT) as client:     # 서버를 띄우고 연결
         tools = await client.list_tools()                     # ① 어떤 도구 있어?
         print("도구 목록:", [t.name for t in tools])
 

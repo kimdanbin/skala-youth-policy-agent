@@ -234,3 +234,5 @@ node_modules/
 dist/
 # macOS
 .DS_Store
+# 실행 로그 (MCP 서버 로그, try_agent 결과)
+logs/

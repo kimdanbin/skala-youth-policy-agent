@@ -1,3 +1,4 @@
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -5,7 +6,8 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 
 ROOT = Path(__file__).resolve().parents[2]
-DB_DIR = ROOT / "vectorstore"
+# 기본은 프로젝트의 vectorstore/. 테스트 등에서 다른 복사본을 쓰고 싶을 때만 VECTORSTORE_DIR로 바꾼다.
+DB_DIR = Path(os.getenv("VECTORSTORE_DIR") or ROOT / "vectorstore")
 
 # 조용한 실패 방지: Chroma는 폴더나 데이터가 없어도 에러 없이 "빈 DB"를 새로 만든다.
 # 그러면 검색 결과가 항상 0개라 모든 답이 "찾지 못했어요"가 되는데, 에러가 안 나서 원인을
@@ -25,9 +27,11 @@ if not _db.get(limit=1)["ids"]:
         "(collection_name이 ingest.py와 다를 때도 이렇게 됩니다)")
 
 
-def search(query: str, k: int = 3):
-    """질문과 가장 가까운 청크 k개를 (문서, 거리) 쌍으로 돌려준다. 거리는 작을수록 가까움."""
-    return _db.similarity_search_with_score(query, k=k)
+def search(query: str, k: int = 3, program: str | None = None):
+    """질문과 가장 가까운 청크 k개를 (문서, 거리) 쌍으로 돌려준다. 거리는 작을수록 가까움.
+    program을 주면 그 사업 문서 안에서만 찾는다(예: "청년월세"). 기본값 None = 전체 (chain.py와 호환)."""
+    flt = {"program": program} if program else None
+    return _db.similarity_search_with_score(query, k=k, filter=flt)
 
 
 if __name__ == "__main__":
