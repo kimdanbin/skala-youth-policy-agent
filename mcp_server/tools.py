@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-POLICIES = json.loads((ROOT / "data" / "raw" / "policies.json").read_text())
+POLICIES = json.loads((ROOT / "data" / "raw" / "policies.json").read_text(encoding="utf-8"))
 CENTRAL = "0054001"                       # 제공기관 그룹코드: 중앙부처
 
 

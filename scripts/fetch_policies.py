@@ -42,14 +42,14 @@ def main():
         if page_file.exists():                         # 이미 받은 페이지는 건너뜀
             continue
         items = first["youthPolicyList"] if page == 1 else fetch_page(page)["youthPolicyList"]
-        page_file.write_text(json.dumps(items, ensure_ascii=False))
+        page_file.write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
         print(f"{page}/{pages} 페이지 저장 ({len(items)}개)")
         time.sleep(1.0)                                # 1초씩 쉬기
 
     policies = []                                      # 페이지 파일들을 하나로 합치기
     for page_file in sorted(PAGES_DIR.glob("page_*.json")):
-        policies += json.loads(page_file.read_text())
-    OUT.write_text(json.dumps(policies, ensure_ascii=False, indent=1))
+        policies += json.loads(page_file.read_text(encoding="utf-8"))
+    OUT.write_text(json.dumps(policies, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"{len(policies)}개 저장 → {OUT}")
 
 if __name__ == "__main__":
