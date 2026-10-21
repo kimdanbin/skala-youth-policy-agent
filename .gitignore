@@ -218,3 +218,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ===== 프로젝트 전용 =====
+# 원본 PDF·추출 텍스트·정책 데이터 (저작권·용량 문제로 저장소에 올리지 않음)
+data/raw/
+data/processed/
+# 벡터 DB
+vectorstore/
+chroma_db/
+# 세션/대화 기록 (개인정보 포함 가능)
+*.db
+*.sqlite3
+# 프론트엔드
+node_modules/
+dist/
+# macOS
+.DS_Store
