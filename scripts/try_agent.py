@@ -14,6 +14,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+from dotenv import load_dotenv   # noqa: E402
+
+load_dotenv(ROOT / ".env")        # LLM_BACKEND, OPENAI_API_KEY, LANGSMITH_* (서버와 같은 설정으로 실행)
+
 from agent.deps import build_real_deps   # noqa: E402
 from agent.graph import build_graph, run   # noqa: E402
 from agent.mcp_tools import McpTools   # noqa: E402
