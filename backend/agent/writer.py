@@ -105,13 +105,26 @@ def clean(text: str) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
 
 
+def local_notice(state: AgentState, answer: str) -> str:
+    """지역 공고 문서를 썼는데 답변이 그걸 밝히지 않았으면 코드가 한 줄 덧붙인다.
+    규칙(7번)으로 시켜도 qwen3·gpt-4o-mini 모두 자주 빠뜨려서(실제 실행 확인) 코드로 보장한다."""
+    dr = state.get("doc_result") or {}
+    regions = dict.fromkeys(c["region"] for c in dr.get("chunks", []) if c.get("region") and c["region"] != "전국")
+    missing = [r for r in regions if f"{r} 공고" not in answer]
+    if not missing:
+        return answer
+    who = "·".join(missing)
+    return answer + f"\n\n※ 안내 자료 중 일부는 {who} 공고 기준이에요. 다른 지역에 살면 기준과 신청 기간이 다를 수 있어요."
+
+
 async def write_node(state: AgentState, deps) -> dict:
     today = await deps.mcp.call_tool("get_today", {})                          # MCP Tool
     catalog = await deps.mcp.read_catalog()                                   # MCP Resource
     facts, sources = _facts(state, str(today), catalog["데이터_기준일"])
     prompt = await deps.mcp.get_answer_prompt(state["question"], facts)       # MCP Prompt
     reply = await deps.llm.ainvoke(prompt)
-    return {"answer": clean(reply.content), "sources": sources, "path": ["write"], "llm_calls": 1}
+    answer = local_notice(state, clean(reply.content))
+    return {"answer": answer, "sources": sources, "path": ["write"], "llm_calls": 1}
 
 
 async def chat_node(state: AgentState, deps) -> dict:

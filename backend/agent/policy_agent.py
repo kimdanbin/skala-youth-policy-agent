@@ -7,6 +7,20 @@
 from .mcp_tools import McpError
 from .state import POLICY_LIMIT, AgentState
 
+# 특정 대상 전용 정책. 질문에 그 말이 없으면 뒤로 미룬다.
+# (실제 실행: '2002년생 전주 월세' 질문에 '신생아 특례 구입·전세대출'이 상위 5개에 들어옴 → 답변에도 그대로 나옴)
+SPECIAL_GROUPS = ("신혼", "신생아", "출산", "임산부", "다자녀", "한부모", "장애", "장병", "군인", "제대",
+                  "북한이탈", "다문화", "중장년", "노인", "어르신")
+
+
+def demote_special(policies: list[dict], question: str) -> tuple[list[dict], list[str]]:
+    """질문과 상관없는 특정 대상 전용 정책을 뒤로 보낸다 (순서만 바꾸고 지우지는 않음)."""
+    def special(p):
+        return any(w in p["정책명"] and w not in question for w in SPECIAL_GROUPS)
+    normal = [p for p in policies if not special(p)]
+    moved = [p for p in policies if special(p)]
+    return normal + moved, [p["정책명"] for p in moved]
+
 
 async def resolve_age(deps, plan: dict) -> dict | None:
     if plan.get("age") is not None:
@@ -27,7 +41,8 @@ async def policy_node(state: AgentState, deps) -> dict:
     plan = state["plan"]
     age = await resolve_age(deps, plan)
     region = plan.get("region")
-    base = {"region": region, "only_open": True, "limit": POLICY_LIMIT}
+    # 넉넉히 받아 와서(3배) 특정 대상 전용 정책을 뒤로 보낸 뒤 상위 POLICY_LIMIT개만 쓴다
+    base = {"region": region, "only_open": True, "limit": POLICY_LIMIT * 3}
     if age:
         base.update(age=age["min"], age_upper=age["max"])
 
@@ -56,7 +71,12 @@ async def policy_node(state: AgentState, deps) -> dict:
                                                        "only_open": False, "limit": 20})
         closed = [x for x in c["정책"] if x["신청상태"] == "마감" and tries[0] in x["정책명"]][:3]
 
+    ordered, moved = demote_special(result["정책"], state["question"])
+    result = {**result, "정책": ordered[:POLICY_LIMIT]}
+
     notes = []
+    if moved:
+        notes.append("특정 대상 전용 정책 뒤로 보냄: " + ", ".join(moved))
     if len(attempts) > 1:
         notes.append("정책 조회 조건 넓힘: " + " → ".join(str(a.get("키워드")) for a in attempts))
     return {"age": age,

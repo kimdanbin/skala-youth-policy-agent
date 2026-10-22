@@ -65,7 +65,7 @@ async function send() {
         <div v-if="m.sources?.length" class="sources">출처: {{ m.sources.join(', ') }}</div>
         <div v-if="m.meta" class="meta">{{ m.meta }}</div>
       </div>
-      <div v-if="sending" class="bubble bot waiting">답변 작성 중… (로컬 모델은 30~80초 걸릴 수 있어요)</div>
+      <div v-if="sending" class="bubble bot waiting">답변 작성 중… (보통 10초 안쪽, 로컬 모델이면 30~80초)</div>
     </section>
     <form @submit.prevent="send">
       <input v-model="input" placeholder="질문을 입력하세요" :disabled="sending" />

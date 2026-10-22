@@ -385,3 +385,25 @@ def test_period_notes_apply_word_after_period():
     from agent.writer import period_notes
     text = "보건복지부는 5월 4일(월)부터 5월 20일(수)까지 ‘청년내일\n저축계좌’ 2026년 신규 가입자를 모집한다고"
     assert "2026-05-04~2026-05-20" in period_notes(text, "2026-10-22", "2026")[0]
+
+
+def test_special_group_policies_are_demoted():
+    """'2002년생 전주 월세' 실제 데이터: 신생아·신혼부부 전용 정책이 상위 5개에서 빠진다 (질문에 그 말이 있으면 유지)"""
+    from agent.policy_agent import demote_special
+    r = tools.find_policies(age=23, age_upper=24, region="전주", keyword="월세", limit=15)
+    ordered, moved = demote_special(r["정책"], "2002년생 전주 사는데 월세 지원 받을 수 있어?")
+    top = [p["정책명"] for p in ordered[:5]]
+    assert "신생아 특례 구입·전세대출" in moved and not any("신생아" in n or "신혼" in n for n in top)
+    assert len(ordered) == len(r["정책"])                      # 지우지 않고 순서만 바꿈
+    _, moved2 = demote_special(r["정책"], "신혼부부인데 전세 지원 있어?")
+    assert not any("신혼" in n for n in moved2)
+
+
+def test_local_notice_added_only_when_missing():
+    from agent.writer import local_notice
+    st = {"doc_result": {"chunks": [{"region": "전주시"}, {"region": "전국"}, {"region": "전주시"}]}}
+    out = local_notice(st, "소득 기준은 60% 이하예요.")
+    assert out.endswith("일부는 전주시 공고 기준이에요. 다른 지역에 살면 기준과 신청 기간이 다를 수 있어요.")
+    assert local_notice(st, "전주시 공고 기준으로 60% 이하예요.") == "전주시 공고 기준으로 60% 이하예요."
+    assert local_notice({"doc_result": {"chunks": [{"region": "전국"}]}}, "답") == "답"
+    assert local_notice({}, "답") == "답"
