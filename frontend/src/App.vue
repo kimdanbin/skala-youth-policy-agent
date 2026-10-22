@@ -7,6 +7,15 @@ const messages = ref([])     // { role: 'user' | 'bot' | 'error', text, sources?
 const sending = ref(false)   // 답을 기다리는 중이면 true → 보내기 버튼 잠금 + "작성 중" 표시
 const logEl = ref(null)
 
+// 답변의 **굵게**만 화면에 그린다. HTML을 먼저 이스케이프해서 답변 속 태그가 실행되지 않게 한다.
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+function render(text) {
+  return String(text ?? '')
+    .replace(/[&<>"']/g, (c) => ESC[c])
+    .replace(/^#{1,6}\s+/gm, '')                         // 혹시 나온 # 제목 기호는 지운다
+    .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+}
+
 async function scrollDown() {
   await nextTick()
   if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight
@@ -52,7 +61,7 @@ async function send() {
     <p class="hint">예) "2002년생 전주 사는데 월세 지원 받을 수 있어?"</p>
     <section ref="logEl" class="log">
       <div v-for="(m, i) in messages" :key="i" :class="['bubble', m.role]">
-        <div class="text">{{ m.text }}</div>
+        <div class="text" v-html="render(m.text)"></div>
         <div v-if="m.sources?.length" class="sources">출처: {{ m.sources.join(', ') }}</div>
         <div v-if="m.meta" class="meta">{{ m.meta }}</div>
       </div>
@@ -66,7 +75,7 @@ async function send() {
 </template>
 
 <style scoped>
-.chat { max-width: 760px; margin: 0 auto; padding: 16px; text-align: left; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+.chat { width: 100%; max-width: 760px; margin: 0 auto; padding: 16px; text-align: left; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
 h1 { font-size: 24px; margin: 0 0 4px; }
 .hint { color: #888; font-size: 14px; margin: 0 0 12px; }
 .log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 8px 0; }

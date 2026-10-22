@@ -17,7 +17,8 @@ GRADE_SYSTEM = """너는 검색 결과 채점자다. [찾을 정보]가 [문서 
 
 def _chunks(results) -> list[dict]:
     return [{"source": d.metadata.get("source"), "program": d.metadata.get("program"),
-             "page": d.metadata.get("page"), "distance": round(float(s), 3), "text": d.page_content}
+             "page": d.metadata.get("page"), "year": d.metadata.get("year"), "issuer": d.metadata.get("issuer"),
+             "region": d.metadata.get("region"), "distance": round(float(s), 3), "text": d.page_content}
             for d, s in results]
 
 

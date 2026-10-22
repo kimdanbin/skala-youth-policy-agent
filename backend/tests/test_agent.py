@@ -312,4 +312,76 @@ def test_real_mcp_server():
     assert today == "2026-10-21"                              # FAKE_TODAY가 서버 프로세스까지 전달됨
     assert age["만나이_최소"] == 23 and reg["지역"] == "전북특별자치도 전주시"
     assert pol["조건"]["지역"] == "전북특별자치도 전주시" and len(pol["정책"]) <= 3
-    assert cat["전체_정책수"] == 3472 and "6. 끝에 참고한 출처" in prompt
+    assert cat["전체_정책수"] == 3472 and "사용자가 밝힌 정보가 없으면 해당 여부를 말하지 않고" in prompt
+
+
+def test_doc_facts_show_issuer_and_region():
+    """지역 공고인지 LLM이 알 수 있게, 발췌마다 발행기관·적용 지역을 붙인다 (없으면 생략)"""
+    from agent.writer import _facts
+    chunks = [{"source": "2026_청년월세_전주시", "page": 3, "issuer": "전주시", "region": "전북 전주시", "text": "소득 기준"},
+              {"source": "2026_청년정책집_x", "page": 1, "text": "내용"}]
+    facts, sources = _facts({"question": "청년월세 소득 기준", "doc_result": {"enough": True, "reason": "", "chunks": chunks}},
+                            "2026-10-22", "2026-10-19")
+    assert "(2026_청년월세_전주시 3쪽 · 발행: 전주시 · 적용 지역: 전북 전주시)" in facts
+    assert "(2026_청년정책집_x 1쪽)" in facts
+    assert sources == ["2026_청년월세_전주시 3쪽", "2026_청년정책집_x 1쪽"]
+
+
+@pytest.mark.parametrize("text,today,expect", [
+    ("신청기간 : 2026. 3. 30.(월) 09:00 ~ 5. 29.(금) 16:00", "2026-10-22", "2026-03-30~2026-05-29 → 오늘(2026-10-22) 기준 이미 지났음"),
+    ("신청: 2026. 10. 1. ~ 2026. 10. 31.", "2026-10-22", "기준 진행 중"),
+    ("모집 2026. 11. 2. ~ 11. 20.", "2026-10-22", "기준 아직 시작 전"),
+    ("접수 2026. 12. 1. ~ 1. 15.", "2027-01-10", "2026-12-01~2027-01-15 → 오늘(2027-01-10) 기준 진행 중"),   # 해 넘김
+])
+def test_period_notes(text, today, expect):
+    from agent.writer import period_notes
+    notes = period_notes(text, today)
+    assert len(notes) == 1 and expect in notes[0]
+
+
+def test_period_notes_ignores_non_periods():
+    from agent.writer import period_notes
+    text = "19~34세(1991년생~2007년생) · 지급기간 : ~ 2028. 12. · 2026. 13. 1. ~ 2. 1."
+    assert period_notes(text, "2026-10-22") == [] and period_notes("2026. 3. 1. ~ 3. 2.", "잘못된날짜") == []
+
+
+def test_doc_facts_mark_past_period():
+    """마감 여부는 코드가 계산해서 사실 목록에 붙인다 (실제 전주시 1쪽 문구 형식)"""
+    from agent.writer import _facts
+    chunks = [{"source": "2026_청년월세_전주시", "page": 1, "text": "m 신청기간 : 2026. 3. 30.(월) 09:00 ~ 5. 29.(금) 16:00"}]
+    facts, _ = _facts({"question": "청년월세", "doc_result": {"enough": True, "reason": "", "chunks": chunks}},
+                      "2026-10-22", "2026-10-19")
+    assert "[기간 확인] '2026. 3. 30.(월) 09:00 ~ 5. 29' = 2026-03-30~2026-05-29 → 오늘(2026-10-22) 기준 이미 지났음" in facts
+
+
+@pytest.mark.parametrize("text,expect", [
+    ("신청 기간(5.4.~5.20.)", "2026-05-04~2026-05-20 → 오늘(2026-10-22) 기준 이미 지났음"),          # 청년내일저축계좌 2쪽 형식
+    ("5월 4일부터 5월 20일까지 신규 모집", "2026-05-04~2026-05-20"),                                 # 청년내일저축계좌 1쪽 형식
+    ("신청 10월 1일 ~ 31일", "2026-10-01~2026-10-31 → 오늘(2026-10-22) 기준 진행 중"),
+])
+def test_period_notes_without_year_uses_document_year(text, expect):
+    from agent.writer import period_notes
+    notes = period_notes(text, "2026-10-22", 2026)
+    assert len(notes) == 1 and expect in notes[0]
+
+
+def test_period_notes_no_double_count_and_no_decimals():
+    from agent.writer import period_notes
+    assert len(period_notes("신청 2026. 3. 1. ~ 3. 2.", "2026-10-22")) == 1          # 연도 패턴과 연도 없는 패턴이 겹쳐도 1번만
+    assert period_notes("금리 1.5~2.0% · 재산 1.22억 · 0.5.~1.2", "2026-10-22") == []
+
+
+def test_period_notes_only_application_periods():
+    """근무 기간·지급 기간은 표시하지 않는다 (정책집 36쪽 실제 문구)"""
+    from agent.writer import period_notes
+    work = "신청은 2026년 8월까지 하고, 뽑히면 2026년 5월 18일부터 12월 31일까지 일해요."
+    assert period_notes(work, "2026-10-22", 2026) == []
+    assert period_notes("예산 집행: 2026. 1. 1. ~ 12. 31.", "2026-10-22") == []      # 신청 단어가 없으면 표시 안 함
+    assert len(period_notes("접수 2026. 10. 1. ~ 10. 31.", "2026-10-22")) == 1
+
+
+def test_period_notes_apply_word_after_period():
+    """청년내일저축계좌 1쪽 실제 문구: '모집'이 기간 뒤에 온다"""
+    from agent.writer import period_notes
+    text = "보건복지부는 5월 4일(월)부터 5월 20일(수)까지 ‘청년내일\n저축계좌’ 2026년 신규 가입자를 모집한다고"
+    assert "2026-05-04~2026-05-20" in period_notes(text, "2026-10-22", "2026")[0]

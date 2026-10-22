@@ -54,7 +54,7 @@ async def run(graph, question: str) -> dict:
     started = time.perf_counter()
     try:
         state = await asyncio.wait_for(
-            graph.ainvoke({"question": question}, config={"recursion_limit": RECURSION_LIMIT}),
+            graph.ainvoke({"question": question}, config={"recursion_limit": RECURSION_LIMIT, "run_name": "youth-policy-agent"}),
             timeout=TIMEOUT_SEC)
         error = None
     except Exception as e:                          # 시간 초과·Ollama 꺼짐·MCP 오류 등
